@@ -45,6 +45,26 @@ def find_target_channel_in_meta(ome_meta_str, target_channels):
     ids = chain.from_iterable(ids_per_cycle)
     return ids
 
+def remove_other_channels_from_meta(ome_meta_str, target_channels):
+    ome_xml = get_xml_with_stripped_ns(ome_meta_str)
+    proper_ome_attribs = {'xmlns': 'http://www.openmicroscopy.org/Schemas/OME/2016-06',
+                          'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
+                          'xsi:schemaLocation': 'http://www.openmicroscopy.org/Schemas/OME/2016-06 http://www.openmicroscopy.org/Schemas/OME/2016-06/ome.xsd'}
+    ome_xml.attrib.clear()
+    for attr, val in proper_ome_attribs.items():
+        ome_xml.set(attr, val)
+
+    channels = ome_xml.find('Image').find('Pixels').findall('Channel')
+    num_channels = len(channels)
+    for ch in channels:
+        if any(target_ch in ch.get('Name') for target_ch in target_channels):
+            pass
+        else:
+            ome_xml.find('Image').find('Pixels').remove(ch)
+            num_channels -= 1
+    ome_xml.find('Image').find('Pixels').set('SizeC', str(num_channels))
+    new_ome_meta = ET.tostring(ome_xml)
+    return new_ome_meta
 
 def read_img_meta(path):
     with tif.TiffFile(path) as TF:
@@ -52,12 +72,12 @@ def read_img_meta(path):
     return ome_meta
 
 
-def save_target_channels(path, ids, out_dir, channel_name_list):
+def save_target_channels(path, ids, out_dir, channel_name_list, ome_meta):
     file_name = '_'.join((ch.replace(' ', '_') for ch in channel_name_list)) + '.tif'
     out_path = out_dir.joinpath(file_name)
     with tif.TiffWriter(out_path, bigtiff=True) as TW:
         for _id in ids:
-            TW.save(tif.imread(path, key=_id), photometric='minisblack')
+            TW.save(tif.imread(path, key=_id), photometric='minisblack', description=ome_meta)
 
 
 def parse_channel_names_from_cmd(channel_names_str):
@@ -70,7 +90,8 @@ def main(img_path: Path, out_dir: Path, target_channels):
     ome_meta_str = read_img_meta(str_img_path)
     channel_name_list = parse_channel_names_from_cmd(target_channels)
     target_channel_ids = find_target_channel_in_meta(ome_meta_str, channel_name_list)
-    save_target_channels(str_img_path, target_channel_ids, out_dir, channel_name_list)
+    new_ome_meta = remove_other_channels_from_meta(ome_meta_str, target_channels)
+    save_target_channels(str_img_path, target_channel_ids, out_dir, channel_name_list, new_ome_meta)
 
 
 
