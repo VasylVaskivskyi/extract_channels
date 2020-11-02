@@ -45,8 +45,29 @@ def find_target_channel_in_meta(ome_meta_str, target_channels):
     ids = chain.from_iterable(ids_per_cycle)
     return ids
 
+def check_if_name_contains_target_channel(test_channel_name, target_channel_names):
+    result = False
+    for target_ch in target_channel_names:
+        if target_ch.lower() in test_channel_name.lower():
+            result = True
+    return result
+
 def remove_other_channels_from_meta(ome_meta_str, target_channels):
     ome_xml = get_xml_with_stripped_ns(ome_meta_str)
+
+    channels = ome_xml.find('Image').find('Pixels').findall('Channel')
+    #ifds = ome_xml.find('Image').find('Pixels').findall('TiffData')
+
+    num_channels = len(channels)
+    for ch in channels:
+        this_channel_name = ch.get('Name')
+        passed = check_if_name_contains_target_channel(this_channel_name, target_channels)
+        if not passed:
+            ome_xml.find('Image').find('Pixels').remove(ch)
+            num_channels -= 1
+
+    ome_xml.find('Image').find('Pixels').set('SizeC', str(num_channels))
+
     proper_ome_attribs = {'xmlns': 'http://www.openmicroscopy.org/Schemas/OME/2016-06',
                           'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
                           'xsi:schemaLocation': 'http://www.openmicroscopy.org/Schemas/OME/2016-06 http://www.openmicroscopy.org/Schemas/OME/2016-06/ome.xsd'}
@@ -54,15 +75,6 @@ def remove_other_channels_from_meta(ome_meta_str, target_channels):
     for attr, val in proper_ome_attribs.items():
         ome_xml.set(attr, val)
 
-    channels = ome_xml.find('Image').find('Pixels').findall('Channel')
-    num_channels = len(channels)
-    for ch in channels:
-        if any(target_ch in ch.get('Name') for target_ch in target_channels):
-            pass
-        else:
-            ome_xml.find('Image').find('Pixels').remove(ch)
-            num_channels -= 1
-    ome_xml.find('Image').find('Pixels').set('SizeC', str(num_channels))
     new_ome_meta = ET.tostring(ome_xml)
     return new_ome_meta
 
@@ -85,13 +97,13 @@ def parse_channel_names_from_cmd(channel_names_str):
     return channel_name_list
 
 
-def main(img_path: Path, out_dir: Path, target_channels):
+def main(img_path: Path, out_dir: Path, target_channels_str):
     str_img_path = path_to_str(img_path)
     ome_meta_str = read_img_meta(str_img_path)
-    channel_name_list = parse_channel_names_from_cmd(target_channels)
-    target_channel_ids = find_target_channel_in_meta(ome_meta_str, channel_name_list)
-    new_ome_meta = remove_other_channels_from_meta(ome_meta_str, target_channels)
-    save_target_channels(str_img_path, target_channel_ids, out_dir, channel_name_list, new_ome_meta)
+    target_channels_list = parse_channel_names_from_cmd(target_channels_str)
+    target_channel_ids = find_target_channel_in_meta(ome_meta_str, target_channels_list)
+    new_ome_meta = remove_other_channels_from_meta(ome_meta_str, target_channels_list)
+    save_target_channels(str_img_path, target_channel_ids, out_dir, target_channels_list, new_ome_meta)
 
 
 
