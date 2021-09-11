@@ -5,7 +5,7 @@ authors:
   given-names: "Vasyl"
   orcid: "https://orcid.org/0000-0002-4080-4965"
 title: "Testing Citation"
-version: 1.0.1
-doi: 10.5281/zenodo.5501546
+version: 1.0.2
+doi: 10.5281/zenodo.5501549
 date-released: 2021-09-11
 url: "https://github.com/VasylVaskivskyi/extract_channels"
